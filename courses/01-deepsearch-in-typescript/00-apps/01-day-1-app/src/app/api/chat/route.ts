@@ -2,6 +2,7 @@ import type { Message } from "ai";
 import {
   streamText,
   createDataStreamResponse,
+  experimental_createMCPClient as createMCPClient,
 } from "ai";
 import { model } from "~/models";
 import { auth } from "~/server/auth";
@@ -70,6 +71,13 @@ export async function POST(request: Request) {
     }, { status: 401 });
   }
 
+  const mcpClient = await createMCPClient({
+    transport: {
+      type: 'sse',
+      url: 'http://localhost:8000/sse'
+    }
+  });
+
   const body = (await request.json()) as {
     messages: Array<Message>;
   };
@@ -87,6 +95,8 @@ export async function POST(request: Request) {
 
   const user = result.user;
 
+  const mcpTools = await mcpClient.tools();
+
   // Track the request
   await db.insert(userRequests).values({
     userId: user.id,
@@ -102,12 +112,9 @@ export async function POST(request: Request) {
         model,
         messages,
         system: [
-          "You are a research assistant with access to search the web.",
-          "Ensure that the question that the user asks actually requires searching the web before answering.",
-          "If the question does not require research, reject it.",
-          "Always use the searchWeb tool before answering.",
+          "You are a helpful assistant with access to search the web and getting weather data.",
+          "Ensure that the question that the user asks actually requires searching the web or getting weather data before answering.",
           "When you have all the information you need, answer the questions and provide inline link citations of your sources.",
-          "Try to limit the amount of searchWeb tool calls you make.",
           "Provide some pre-amble to let the user know what you are doing.",
           "Always render the output as markdown."
         ].join("\n"),
@@ -130,9 +137,14 @@ export async function POST(request: Request) {
               console.dir(plainResults)
               return plainResults;
             }
-          }
+          },
+          ...mcpTools
         },
-        maxSteps: 10
+        maxSteps: 10,
+        onFinish: async () => {
+          // cleanup
+          await mcpClient.close();
+        }
       });
 
       result.mergeIntoDataStream(dataStream);
