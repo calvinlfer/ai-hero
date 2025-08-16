@@ -1,11 +1,12 @@
 import ReactMarkdown, { type Components } from "react-markdown";
-import { Bolt, PhoneOutgoing, PhoneIncoming, ChevronDown, ChevronRight } from "lucide-react";
+import { Bolt, PhoneOutgoing, PhoneIncoming, ChevronDown, ChevronRight, Link } from "lucide-react";
 import type { Message } from "ai";
 import { useState } from "react";
 
 export type MessagePart = NonNullable<Message["parts"]>[number];
 export type Role = Message["role"];
 export type ToolInvocationUIPart = Extract<MessagePart, { type: "tool-invocation" }>;
+export type SourceUIPart = Extract<MessagePart, { type: "source" }>;
 
 interface ChatMessageProps {
   parts: MessagePart[];
@@ -132,6 +133,23 @@ const ToolInvocation = ({ part }: { part: ToolInvocationUIPart }) => {
   );
 };
 
+const Source = ({ part }: { part: SourceUIPart }) => {
+  const source = part.source;
+  return (
+    <div className="mb-4 rounded-lg border border-purple-500/30 bg-purple-950/20 p-3">
+      <div className="text-sm text-purple-300">
+        <div className="flex items-center gap-2 font-medium">
+          <Link className="size-4" />
+          Source
+        </div>
+        <a href={source.url} target="_blank" rel="noopener noreferrer">
+          {source.title ?? source.url}
+        </a>
+      </div>
+    </div>
+  );
+}
+
 export const ChatMessage = ({ parts, role, userName }: ChatMessageProps) => {
   const isAI = role === "assistant";
 
@@ -155,6 +173,10 @@ export const ChatMessage = ({ parts, role, userName }: ChatMessageProps) => {
 
                 if (part.type === "tool-invocation") {
                   return <ToolInvocation key={index} part={part} />;
+                }
+
+                if (part.type === "source") {
+                  return <Source key={index} part={part} />;
                 }
 
                 // For other part types we're not handling yet, return null

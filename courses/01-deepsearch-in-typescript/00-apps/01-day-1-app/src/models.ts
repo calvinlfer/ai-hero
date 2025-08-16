@@ -1,4 +1,6 @@
-import { openai } from "@ai-sdk/openai";
+import { google } from "@ai-sdk/google";
 import "./env.js";
 
-export const model = openai('gpt-5-nano');
+export const model = google('gemini-2.5-flash', {
+  useSearchGrounding: true,
+})
