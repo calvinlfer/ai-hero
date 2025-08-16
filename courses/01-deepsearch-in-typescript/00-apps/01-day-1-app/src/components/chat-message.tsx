@@ -1,8 +1,15 @@
 import ReactMarkdown, { type Components } from "react-markdown";
+import { Bolt, PhoneOutgoing, PhoneIncoming, ChevronDown, ChevronRight } from "lucide-react";
+import type { Message } from "ai";
+import { useState } from "react";
+
+export type MessagePart = NonNullable<Message["parts"]>[number];
+export type Role = Message["role"];
+export type ToolInvocationUIPart = Extract<MessagePart, { type: "tool-invocation" }>;
 
 interface ChatMessageProps {
-  text: string;
-  role: string;
+  parts: MessagePart[];
+  role: Role;
   userName: string;
 }
 
@@ -38,22 +45,123 @@ const Markdown = ({ children }: { children: string }) => {
   return <ReactMarkdown components={components}>{children}</ReactMarkdown>;
 };
 
-export const ChatMessage = ({ text, role, userName }: ChatMessageProps) => {
+const ToolInvocation = ({ part }: { part: ToolInvocationUIPart }) => {
+  const { toolInvocation } = part;
+  const [showArgs, setShowArgs] = useState(false);
+  const [showResult, setShowResult] = useState(false);
+
+  if (toolInvocation.state === "partial-call") {
+    return (
+      <div className="mb-4 rounded-lg border border-blue-500/30 bg-blue-950/20 p-3">
+        <div className="flex items-center gap-2 text-sm text-blue-300">
+          <div className="size-2 animate-pulse rounded-full bg-blue-400"></div>
+          <div className="flex items-center gap-2 font-medium">
+            <PhoneOutgoing className="size-4" />
+            Calling {toolInvocation.toolName}...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (toolInvocation.state === "call") {
+    return (
+      <div className="mb-4 rounded-lg border border-yellow-500/30 bg-yellow-950/20 p-3">
+        <div className="text-sm text-yellow-300">
+          <div className="flex items-center gap-2 font-medium">
+            <PhoneIncoming className="size-4" />
+            {toolInvocation.toolName}
+          </div>
+          <button
+            onClick={() => setShowArgs(!showArgs)}
+            className="mt-2 flex items-center gap-1 text-xs text-yellow-400 hover:text-yellow-300"
+          >
+            {showArgs ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+            Arguments
+          </button>
+          {showArgs && (
+            <div className="mt-1 text-xs text-yellow-400">
+              <pre className="whitespace-pre-wrap">{JSON.stringify(toolInvocation.args, null, 2)}</pre>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (toolInvocation.state === "result") {
+    return (
+      <div className="mb-4 rounded-lg border border-green-500/30 bg-green-950/20 p-3">
+        <div className="text-sm text-green-300">
+          <div className="flex items-center gap-2 font-medium">
+            <Bolt className="size-4" />
+            {toolInvocation.toolName}
+          </div>
+          <button
+            onClick={() => setShowArgs(!showArgs)}
+            className="mt-2 flex items-center gap-1 text-xs text-green-400 hover:text-green-300"
+          >
+            {showArgs ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+            Arguments
+          </button>
+          {showArgs && (
+            <div className="mt-1 text-xs text-green-400">
+              <pre className="whitespace-pre-wrap">{JSON.stringify(toolInvocation.args, null, 2)}</pre>
+            </div>
+          )}
+          <button
+            onClick={() => setShowResult(!showResult)}
+            className="mt-2 flex items-center gap-1 text-xs text-green-200 hover:text-green-100"
+          >
+            {showResult ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+            Result
+          </button>
+          {showResult && (
+            <div className="mt-1 text-xs text-green-200">
+              <pre className="whitespace-pre-wrap">{JSON.stringify(toolInvocation.result, null, 2)}</pre>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+    </>
+  );
+};
+
+export const ChatMessage = ({ parts, role, userName }: ChatMessageProps) => {
   const isAI = role === "assistant";
 
   return (
     <div className="mb-6">
       <div
-        className={`rounded-lg p-4 ${
-          isAI ? "bg-gray-800 text-gray-300" : "bg-gray-900 text-gray-300"
-        }`}
+        className={`rounded-lg p-4 ${isAI ? "bg-gray-800 text-gray-300" : "bg-gray-900 text-gray-300"
+          }`}
       >
         <p className="mb-2 text-sm font-semibold text-gray-400">
           {isAI ? "AI" : userName}
         </p>
 
         <div className="prose prose-invert max-w-none">
-          <Markdown>{text}</Markdown>
+          {
+            (
+              parts.map((part, index) => {
+                if (part.type === "text") {
+                  return <Markdown key={index}>{part.text}</Markdown>;
+                }
+
+                if (part.type === "tool-invocation") {
+                  return <ToolInvocation key={index} part={part} />;
+                }
+
+                // For other part types we're not handling yet, return null
+                return null;
+              })
+            )
+          }
         </div>
       </div>
     </div>
