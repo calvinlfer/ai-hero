@@ -7,20 +7,92 @@ import { model } from "~/models";
 import { auth } from "~/server/auth";
 import { z } from "zod";
 import { searchSerper } from "~/serper";
+import { db } from "~/server/db";
+import { userRequests, users, type DB } from "~/server/db/schema";
+import { eq, gte, and, sql } from "drizzle-orm";
 
 
 export const maxDuration = 60;
+
+export const MaxRequestsPerDay = 10;
+
+type RateLimitResult =
+  | { type: "success", user: DB.User }
+  | { type: "unauthorized", error: string }
+  | { type: "rate-limited", error: string }
+  ;
+
+async function checkRateLimit(userId: string): Promise<RateLimitResult> {
+  // get the user from the database to check if they're an admin
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+  });
+
+  // if the user is not in the database, stop this from going thru, Next.JS Auth takes care of creating the user for you
+  if (!user) {
+    console.error(`User ${userId} not found in database`);
+    return { type: "unauthorized", error: "User not found" };
+  }
+
+  // if the user is not an admin, check if they have exceeded their request limit
+  if (!user.isAdmin) {
+    const requestsInLastDay =
+      await db
+        .select({
+          count: sql<number>`count(*)`,
+        })
+        .from(userRequests)
+        .where(
+          and(
+            eq(userRequests.userId, user.id),
+            gte(userRequests.createdAt, sql`CURRENT_TIMESTAMP - INTERVAL '1 day'`),
+          ),
+        );
+
+    const requestsMade = requestsInLastDay[0]?.count ?? 0;
+
+    if (requestsMade >= MaxRequestsPerDay) {
+      return { type: "rate-limited", error: "Too many requests" };
+    }
+  }
+
+  return { type: "success", user };
+}
 
 export async function POST(request: Request) {
   const session = await auth();
 
   if (!session) {
-    return new Response("Unauthorized", { status: 401 });
+    return Response.json({
+      error: "Unauthorized",
+      message: "You must be signed in to chat.",
+      state: "not-logged-in",
+    }, { status: 401 });
   }
 
   const body = (await request.json()) as {
     messages: Array<Message>;
   };
+
+  const result = await checkRateLimit(session.user.id);
+  if (result.type !== "success") {
+    if (result.type === "unauthorized") {
+      return new Response(result.error, { status: 401 });
+    } else if (result.type === "rate-limited") {
+      return new Response(result.error, { status: 429 });
+    } else {
+      return new Response("Unknown error", { status: 500 });
+    }
+  }
+
+  const user = result.user;
+
+  // Track the request
+  await db.insert(userRequests).values({
+    userId: user.id,
+    endpoint: "/api/chat",
+    status: "completed",
+  });
 
   return createDataStreamResponse({
     execute: async (dataStream) => {

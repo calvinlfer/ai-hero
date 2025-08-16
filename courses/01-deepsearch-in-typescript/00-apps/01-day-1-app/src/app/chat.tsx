@@ -2,6 +2,7 @@
 
 import { ChatMessage } from "~/components/chat-message";
 import { SignInModal } from "~/components/sign-in-modal";
+import { RateLimitedModal } from "~/components/rate-limited-modal";
 import { useChat } from "@ai-sdk/react";
 import { useState } from "react";
 import { Square } from "lucide-react";
@@ -12,6 +13,7 @@ interface ChatProps {
 
 export const ChatPage = ({ userName }: ChatProps) => {
   const [getSignInModal, setSignInModal] = useState(false);
+  const [getRateLimitedModal, setRateLimitedModal] = useState(false);
 
   const {
     messages,
@@ -26,6 +28,10 @@ export const ChatPage = ({ userName }: ChatProps) => {
       console.error(`Error in useChat: ${error.message}`);
       if (error.message.includes("Unauthorized")) {
         setSignInModal(true);
+      }
+
+      if (error.message.includes("Too many requests")) {
+        setRateLimitedModal(true);
       }
     },
   });
@@ -78,6 +84,7 @@ export const ChatPage = ({ userName }: ChatProps) => {
       </div>
 
       <SignInModal isOpen={getSignInModal} onClose={() => setSignInModal(false)} />
+      <RateLimitedModal isOpen={getRateLimitedModal} onClose={() => setRateLimitedModal(false)} />
     </>
   );
 };
