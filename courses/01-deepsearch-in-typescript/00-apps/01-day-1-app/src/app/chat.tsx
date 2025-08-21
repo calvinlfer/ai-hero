@@ -4,16 +4,20 @@ import { ChatMessage } from "~/components/chat-message";
 import { SignInModal } from "~/components/sign-in-modal";
 import { RateLimitedModal } from "~/components/rate-limited-modal";
 import { useChat } from "@ai-sdk/react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Square } from "lucide-react";
+import { isNewChatCreated } from "~/lib/chat-utils";
 
 interface ChatProps {
   userName: string;
+  chatId: string | undefined;
 }
 
-export const ChatPage = ({ userName }: ChatProps) => {
+export const ChatPage = ({ userName, chatId }: ChatProps) => {
   const [getSignInModal, setSignInModal] = useState(false);
   const [getRateLimitedModal, setRateLimitedModal] = useState(false);
+  const router = useRouter();
 
   const {
     messages,
@@ -22,8 +26,12 @@ export const ChatPage = ({ userName }: ChatProps) => {
     handleSubmit,
     stop,
     status, // isLoading is deprecated
+    data // for custom messages from the server that are user-defined and not sent by the SDK
   } = useChat({
     api: '/api/chat',
+    body: {
+      chatId,
+    },
     onError(error) {
       console.error(`Error in useChat: ${error.message}`);
       if (error.message.includes("Unauthorized")) {
@@ -35,6 +43,14 @@ export const ChatPage = ({ userName }: ChatProps) => {
       }
     },
   });
+
+  // redirect logic for new chats
+  useEffect(() => {
+    const lastDataItem = data?.[data.length - 1];
+    if (lastDataItem && isNewChatCreated(lastDataItem)) {
+      router.push(`?chatId=${lastDataItem.chatId}`);
+    }
+  }, [data]);
 
   return (
     <>

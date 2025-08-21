@@ -107,6 +107,7 @@ export async function POST(request: Request) {
   });
 
   const chatId = body.chatId ?? crypto.randomUUID();
+  const isNewChat = body.chatId === undefined;
   await queries.upsertChat({
     userId: user.id,
     chatId,
@@ -116,6 +117,14 @@ export async function POST(request: Request) {
 
   return createDataStreamResponse({
     execute: async (dataStream) => {
+      if (isNewChat) {
+        // message the client that a new chat was created
+        dataStream.writeData({
+          type: 'NEW_CHAT_CREATED',
+          chatId,
+        })
+      }
+
       const { messages } = body;
 
       const result = streamText({
