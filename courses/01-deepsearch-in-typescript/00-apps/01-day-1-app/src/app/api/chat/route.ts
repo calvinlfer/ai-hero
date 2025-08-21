@@ -2,12 +2,14 @@ import type { Message } from "ai";
 import {
   streamText,
   createDataStreamResponse,
+  appendResponseMessages
 } from "ai";
 import { model } from "~/models";
 import { auth } from "~/server/auth";
 import { z } from "zod";
 import { searchSerper } from "~/serper";
 import { db } from "~/server/db";
+import * as queries from "~/server/db/queries";
 import { userRequests, users, type DB } from "~/server/db/schema";
 import { eq, gte, and, sql } from "drizzle-orm";
 
@@ -71,8 +73,18 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json()) as {
-    messages: Array<Message>;
+    messages: Array<Message>,
+    chatId?: string
   };
+
+  if (body.messages.length === 0) {
+    return Response.json({
+      error: "Bad Request",
+      message: "You must provide a message.",
+      state: "bad-request",
+    }, { status: 400 });
+  }
+
 
   const result = await checkRateLimit(session.user.id);
   if (result.type !== "success") {
@@ -92,6 +104,14 @@ export async function POST(request: Request) {
     userId: user.id,
     endpoint: "/api/chat",
     status: "completed",
+  });
+
+  const chatId = body.chatId ?? crypto.randomUUID();
+  await queries.upsertChat({
+    userId: user.id,
+    chatId,
+    title: body.messages[0]?.content ?? "New Chat",
+    messages: body.messages,
   });
 
   return createDataStreamResponse({
@@ -132,7 +152,18 @@ export async function POST(request: Request) {
             }
           }
         },
-        maxSteps: 10
+        maxSteps: 10,
+        onFinish: async ({ finishReason, usage, response }) => {
+          const oldMessages = messages;
+          const newMessages = response.messages
+          const allMessages = appendResponseMessages({ messages: oldMessages, responseMessages: newMessages });
+          await queries.upsertChat({
+            userId: user.id,
+            chatId,
+            title: oldMessages[0]?.content ?? "New Chat",
+            messages: allMessages,
+          });
+        }
       });
 
       result.mergeIntoDataStream(dataStream);

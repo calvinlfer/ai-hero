@@ -3,6 +3,7 @@ import { db } from "./index";
 import { chats, messages, type DB } from "./schema";
 import { eq, and, asc, desc } from "drizzle-orm";
 
+export type Chat = DB.Chat;
 type ChatWithMessages = DB.Chat & { messages: DB.Message[] };
 
 export const upsertChat: (
@@ -106,7 +107,7 @@ export const getChat: (
     const { userId, chatId } = opts;
 
     const chat = await db.query.chats.findFirst({
-      where: and(eq(chats.id, chatId), eq(chats.userId, userId)),
+      where: eq(chats.id, chatId),
       with: {
         messages: {
           orderBy: [asc(messages.order)],
