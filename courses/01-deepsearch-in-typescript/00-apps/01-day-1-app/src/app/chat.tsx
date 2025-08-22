@@ -3,8 +3,8 @@
 import { ChatMessage } from "~/components/chat-message";
 import { SignInModal } from "~/components/sign-in-modal";
 import { RateLimitedModal } from "~/components/rate-limited-modal";
-import { useChat } from "@ai-sdk/react";
-import { useState, useEffect } from "react";
+import { useChat, type Message } from "@ai-sdk/react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Square } from "lucide-react";
 import { isNewChatCreated } from "~/lib/chat-utils";
@@ -12,6 +12,7 @@ import { isNewChatCreated } from "~/lib/chat-utils";
 interface ChatProps {
   userName: string;
   chatId: string | undefined;
+  initialMessages?: Message[];
 }
 
 export const ChatPage = ({ userName, chatId }: ChatProps) => {
@@ -32,6 +33,7 @@ export const ChatPage = ({ userName, chatId }: ChatProps) => {
     body: {
       chatId,
     },
+    initialMessages,
     onError(error) {
       console.error(`Error in useChat: ${error.message}`);
       if (error.message.includes("Unauthorized")) {
