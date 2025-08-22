@@ -15,7 +15,7 @@ interface ChatProps {
   initialMessages?: Message[];
 }
 
-export const ChatPage = ({ userName, chatId }: ChatProps) => {
+export const ChatPage = ({ userName, chatId, initialMessages }: ChatProps) => {
   const [getSignInModal, setSignInModal] = useState(false);
   const [getRateLimitedModal, setRateLimitedModal] = useState(false);
   const router = useRouter();
@@ -46,13 +46,20 @@ export const ChatPage = ({ userName, chatId }: ChatProps) => {
     },
   });
 
+  // data changes each time but the contents are the same
+  // this is because of reference equality on arrays instead of value equality
+  // this is a workaround to prevent the useEffect from running too often
+  const stableData = useMemo(() => data, [JSON.stringify(data)]);
+
   // redirect logic for new chats
   useEffect(() => {
-    const lastDataItem = data?.[data.length - 1];
-    if (lastDataItem && isNewChatCreated(lastDataItem)) {
+    console.log(`useEffect hook running because ${JSON.stringify(data)} keeps changing`)
+    const lastDataItem = stableData?.[stableData.length - 1];
+    if (!chatId && lastDataItem && isNewChatCreated(lastDataItem)) {
+      console.log(`Doing a redirect (${lastDataItem.chatId})`)
       router.push(`?chatId=${lastDataItem.chatId}`);
     }
-  }, [data]);
+  }, [stableData]);
 
   return (
     <>
