@@ -11,11 +11,12 @@ import { isNewChatCreated } from "~/lib/chat-utils";
 
 interface ChatProps {
   userName: string;
-  chatId: string | undefined;
+  chatId: string;
+  isNewChat: boolean;
   initialMessages?: Message[];
 }
 
-export const ChatPage = ({ userName, chatId, initialMessages }: ChatProps) => {
+export const ChatPage = ({ userName, chatId, isNewChat, initialMessages }: ChatProps) => {
   const [getSignInModal, setSignInModal] = useState(false);
   const [getRateLimitedModal, setRateLimitedModal] = useState(false);
   const router = useRouter();
@@ -32,6 +33,7 @@ export const ChatPage = ({ userName, chatId, initialMessages }: ChatProps) => {
     api: '/api/chat',
     body: {
       chatId,
+      isNewChat,
     },
     initialMessages,
     onError(error) {
@@ -55,7 +57,7 @@ export const ChatPage = ({ userName, chatId, initialMessages }: ChatProps) => {
   useEffect(() => {
     console.log(`useEffect hook running because ${JSON.stringify(data)} keeps changing`)
     const lastDataItem = stableData?.[stableData.length - 1];
-    if (!chatId && lastDataItem && isNewChatCreated(lastDataItem)) {
+    if (isNewChat && lastDataItem && isNewChatCreated(lastDataItem)) {
       console.log(`Doing a redirect (${lastDataItem.chatId})`)
       router.push(`?chatId=${lastDataItem.chatId}`);
     }

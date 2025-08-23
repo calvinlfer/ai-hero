@@ -10,7 +10,10 @@ export default async function HomePage({
 }: {
   searchParams: Promise<{ chatId?: string }>;
 }) {
-  const { chatId } = await searchParams;
+  const { chatId: chatIdFromSearchParams } = await searchParams;
+  const stableChatId = chatIdFromSearchParams ?? crypto.randomUUID();
+  const isNewChat = chatIdFromSearchParams === undefined;
+
   const session = await auth();
   const userName = session?.user?.name ?? "Guest";
   const isAuthenticated = !!session?.user;
@@ -21,8 +24,8 @@ export default async function HomePage({
     : [];
 
   // Fetch specific chat if chatId is provided
-  const currentChat = chatId && isAuthenticated && session?.user?.id
-    ? await getChat({ userId: session.user.id, chatId })
+  const currentChat = chatIdFromSearchParams && isAuthenticated && session?.user?.id
+    ? await getChat({ userId: session.user.id, chatId: chatIdFromSearchParams })
     : undefined;
 
   // Map database messages to AI SDK format
@@ -57,7 +60,7 @@ export default async function HomePage({
               <div key={chat.id} className="flex items-center gap-2">
                 <Link
                   href={`/?chatId=${chat.id}`}
-                  className={`flex-1 rounded-lg p-3 text-left text-sm text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 ${chat.id === chatId
+                  className={`flex-1 rounded-lg p-3 text-left text-sm text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 ${chat.id === chatIdFromSearchParams
                     ? "bg-gray-700"
                     : "hover:bg-gray-750 bg-gray-800"
                     }`}
@@ -82,7 +85,7 @@ export default async function HomePage({
         </div>
       </div>
 
-      <ChatPage userName={userName} chatId={chatId} initialMessages={initialMessages} />
+      <ChatPage key={stableChatId} userName={userName} chatId={stableChatId} isNewChat={isNewChat} initialMessages={initialMessages} />
     </div>
   );
 }

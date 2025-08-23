@@ -74,7 +74,8 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as {
     messages: Array<Message>,
-    chatId?: string
+    chatId: string,
+    isNewChat: boolean,
   };
 
   if (body.messages.length === 0) {
@@ -106,8 +107,8 @@ export async function POST(request: Request) {
     status: "completed",
   });
 
-  const chatId = body.chatId ?? crypto.randomUUID();
-  const isNewChat = body.chatId === undefined;
+  const chatId = body.chatId;
+  const isNewChat = body.isNewChat;
   await queries.upsertChat({
     userId: user.id,
     chatId,
@@ -138,7 +139,7 @@ export async function POST(request: Request) {
           "When you have all the information you need, answer the questions and provide inline link citations of your sources.",
           "Try to limit the amount of searchWeb tool calls you make.",
           "Provide some pre-amble to let the user know what you are doing.",
-          "Always render the output as markdown."
+          "Always render the output as GitHub flavoured markdown."
         ].join("\n"),
         tools: {
           searchWeb: {
