@@ -173,7 +173,8 @@ export async function POST(request: Request) {
             title: oldMessages[0]?.content ?? "New Chat",
             messages: allMessages,
           });
-        }
+        },
+        experimental_telemetry: { isEnabled: true }
       });
 
       result.mergeIntoDataStream(dataStream);
