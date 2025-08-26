@@ -8,7 +8,8 @@ import { model } from "~/models";
 import { auth } from "~/server/auth";
 import { z } from "zod";
 import { searchSerper } from "~/serper";
-import { bulkCrawlWebsites } from "~/server/scrape/scraper";
+//import { bulkCrawlWebsites } from "~/server/scrape/scraper";
+import { bulkCrawlWebsites } from "~/server/scrape/jina-reader";
 import { db } from "~/server/db";
 import * as queries from "~/server/db/queries";
 import { userRequests, users, type DB } from "~/server/db/schema";
@@ -156,6 +157,7 @@ export async function POST(request: Request) {
           "When you have all the information you need, answer the questions and provide inline link citations of your sources.",
           "Prioritize recent information.",
           "Use the scrapeUrls tool to get more information from specific URLs.",
+          "Gather a variety of sources (URLs) from searchWeb before using them in scrapeUrls.",
           "Provide some pre-amble to let the user know what you are doing.",
           "Always render the output as GitHub flavoured Markdown.",
           `The current date is ${timeNow.toISOString()}.`,
