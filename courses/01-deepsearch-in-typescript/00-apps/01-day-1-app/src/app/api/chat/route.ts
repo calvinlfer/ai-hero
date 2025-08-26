@@ -8,6 +8,7 @@ import { model } from "~/models";
 import { auth } from "~/server/auth";
 import { z } from "zod";
 import { searchSerper } from "~/serper";
+import { bulkCrawlWebsites } from "~/server/scrape/scraper";
 import { db } from "~/server/db";
 import * as queries from "~/server/db/queries";
 import { userRequests, users, type DB } from "~/server/db/schema";
@@ -152,9 +153,9 @@ export async function POST(request: Request) {
           "If the question does not require research, reject it.",
           "Always use the searchWeb tool before answering.",
           "When you have all the information you need, answer the questions and provide inline link citations of your sources.",
-          "Try to limit the amount of searchWeb tool calls you make.",
+          "Use the scrapeUrls tool to get more information from specific URLs.",
           "Provide some pre-amble to let the user know what you are doing.",
-          "Always render the output as GitHub flavoured markdown."
+          "Always render the output as GitHub flavoured Markdown."
         ].join("\n"),
         tools: {
           searchWeb: {
@@ -164,16 +165,22 @@ export async function POST(request: Request) {
               numResults: z.number().min(10).max(15).describe("The number of results to return [10-15]"),
             }),
             execute: async ({ query, numResults }: { query: string; numResults: number }, { abortSignal }) => {
-              console.log(`Serper: Searching for ${query}, limited to ${numResults} results...`);
               const results = await searchSerper({ q: query, num: numResults }, abortSignal);
               const plainResults = results.organic.map((r) => ({
                 title: r.title,
                 link: r.link,
                 snippet: r.snippet,
               }))
-              console.log(`Serper: Response for ${query}:`)
-              console.dir(plainResults)
               return plainResults;
+            }
+          },
+          scrapeUrls: {
+            description: "Scrape the content from specific URLs",
+            parameters: z.object({
+              urls: z.string().array().describe("URLs that you want to scrape")
+            }),
+            execute: async ({ urls }: { urls: string[] }) => {
+              return await bulkCrawlWebsites({ urls });
             }
           }
         },
