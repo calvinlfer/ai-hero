@@ -15,7 +15,7 @@ export const env = createEnv({
         : z.string().optional(),
     DATABASE_URL: z.string().url(),
     NODE_ENV: z
-      .enum(["development", "test", "production"])
+      .enum(["development", "production"])
       .default("development"),
     SERPER_API_KEY: z.string(),
     LANGFUSE_BASEURL: z.string().url(),

@@ -12,6 +12,8 @@ import { db } from "~/server/db";
 import * as queries from "~/server/db/queries";
 import { userRequests, users, type DB } from "~/server/db/schema";
 import { eq, gte, and, sql } from "drizzle-orm";
+import { Langfuse } from "langfuse";
+import { env } from "~/env";
 
 
 export const maxDuration = 60;
@@ -61,6 +63,13 @@ async function checkRateLimit(userId: string): Promise<RateLimitResult> {
   return { type: "success", user };
 }
 
+const langfuse = new Langfuse({
+  environment: env.NODE_ENV,
+  publicKey: env.LANGFUSE_PUBLIC_KEY,
+  secretKey: env.LANGFUSE_SECRET_KEY,
+  baseUrl: env.LANGFUSE_BASEURL,
+});
+
 export async function POST(request: Request) {
   const session = await auth();
 
@@ -86,7 +95,6 @@ export async function POST(request: Request) {
     }, { status: 400 });
   }
 
-
   const result = await checkRateLimit(session.user.id);
   if (result.type !== "success") {
     if (result.type === "unauthorized") {
@@ -109,6 +117,13 @@ export async function POST(request: Request) {
 
   const chatId = body.chatId;
   const isNewChat = body.isNewChat;
+
+  const trace = langfuse.trace({
+    sessionId: chatId,
+    name: "Chat",
+    userId: user.id,
+  });
+
   await queries.upsertChat({
     userId: user.id,
     chatId,
@@ -173,8 +188,15 @@ export async function POST(request: Request) {
             title: oldMessages[0]?.content ?? "New Chat",
             messages: allMessages,
           });
+          await langfuse.flushAsync();
         },
-        experimental_telemetry: { isEnabled: true }
+        experimental_telemetry: {
+          isEnabled: true,
+          functionId: "agent",
+          metadata: {
+            langfuseTraceId: trace.id,
+          }
+        }
       });
 
       result.mergeIntoDataStream(dataStream);
