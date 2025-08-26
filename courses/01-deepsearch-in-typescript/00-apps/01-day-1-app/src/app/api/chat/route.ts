@@ -143,6 +143,7 @@ export async function POST(request: Request) {
       }
 
       const { messages } = body;
+      const timeNow = new Date();
 
       const result = streamText({
         model,
@@ -153,9 +154,11 @@ export async function POST(request: Request) {
           "If the question does not require research, reject it.",
           "Always use the searchWeb tool before answering.",
           "When you have all the information you need, answer the questions and provide inline link citations of your sources.",
+          "Prioritize recent information.",
           "Use the scrapeUrls tool to get more information from specific URLs.",
           "Provide some pre-amble to let the user know what you are doing.",
-          "Always render the output as GitHub flavoured Markdown."
+          "Always render the output as GitHub flavoured Markdown.",
+          `The current date is ${timeNow.toISOString()}.`,
         ].join("\n"),
         tools: {
           searchWeb: {
@@ -170,6 +173,7 @@ export async function POST(request: Request) {
                 title: r.title,
                 link: r.link,
                 snippet: r.snippet,
+                date: r.date,
               }))
               return plainResults;
             }
