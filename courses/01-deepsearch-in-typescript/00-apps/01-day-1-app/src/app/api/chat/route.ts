@@ -8,7 +8,6 @@ import { model } from "~/models";
 import { auth } from "~/server/auth";
 import { z } from "zod";
 import { searchSerper } from "~/serper";
-//import { bulkCrawlWebsites } from "~/server/scrape/scraper";
 import { bulkCrawlWebsites } from "~/server/scrape/jina-reader";
 import { db } from "~/server/db";
 import * as queries from "~/server/db/queries";
@@ -222,7 +221,7 @@ export async function POST(request: Request) {
           const oldMessages = messages;
           const newMessages = response.messages
           const allMessages = appendResponseMessages({ messages: oldMessages, responseMessages: newMessages });
-          await queries.upsertChat({
+          await mkSpan("upsert-chat-to-db", queries.upsertChat)({
             userId: user.id,
             chatId,
             title: oldMessages[0]?.content ?? "New Chat",
