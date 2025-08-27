@@ -28,9 +28,22 @@ type RateLimitResult =
   | { type: "rate-limited", error: string }
   ;
 
+const spanner =
+  (client: LangfuseTraceClient) =>
+    <In, Out>(name: string, fn: (input: In) => Promise<Out>) =>
+      async (input: In) => {
+        const span = client.span({
+          name,
+          input,
+        });
+        const output = await fn(input);
+        span.end({
+          output,
+        });
+        return output;
+      }
 
-
-async function checkRateLimit(userId: string): Promise<RateLimitResult> {
+async function checkRateLimit({ userId }: { userId: string }): Promise<RateLimitResult> {
   // get the user from the database to check if they're an admin
   const user = await db.query.users.findFirst({
     where: eq(users.id, userId),
@@ -79,6 +92,7 @@ export async function POST(request: Request) {
   const trace = langfuse.trace({
     name: "Chat"
   });
+  const mkSpan = spanner(trace);
 
   const session = await auth();
   if (!session) {
@@ -109,16 +123,7 @@ export async function POST(request: Request) {
     }, { status: 400 });
   }
 
-  const checkRateLimitSpan = trace.span({
-    name: "check-rate-limit",
-    input: {
-      userId: session.user.id,
-    }
-  })
-  const result = await checkRateLimit(session.user.id);
-  checkRateLimitSpan.end({
-    output: { result, }
-  });
+  const result = await mkSpan("check-rate-limit", checkRateLimit)({ userId: session.user.id });
 
   if (result.type !== "success") {
     if (result.type === "unauthorized") {
@@ -132,40 +137,28 @@ export async function POST(request: Request) {
 
   const user = result.user;
 
-  const userRequestsSpan = trace.span({
-    name: "track-request",
-    input: {
-      userId: user.id,
-      endpoint: "/api/chat",
-      status: "completed",
-    }
-  })
-  await db.insert(userRequests).values({
+  await mkSpan("track-request", async (input: {
+    userId: string,
+    endpoint: string,
+    status: string
+  }) => {
+    await db.insert(userRequests).values(input);
+  })({
     userId: user.id,
     endpoint: "/api/chat",
     status: "completed",
   });
-  userRequestsSpan.end();
 
   const chatId = body.chatId;
   const isNewChat = body.isNewChat;
 
-  const upsertChatSpan = trace.span({
-    name: "upsert-chat",
-    input: {
-      userId: user.id,
-      chatId,
-      title: body.messages[0]?.content ?? "New Chat",
-      messages: body.messages,
-    }
-  })
-  await queries.upsertChat({
+
+  await mkSpan("upsert-chat", queries.upsertChat)({
     userId: user.id,
     chatId,
     title: body.messages[0]?.content ?? "New Chat",
     messages: body.messages,
   });
-  upsertChatSpan.end();
 
   return createDataStreamResponse({
     execute: async (dataStream) => {
