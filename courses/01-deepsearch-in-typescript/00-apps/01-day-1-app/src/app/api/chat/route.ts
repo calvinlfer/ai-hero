@@ -1,19 +1,13 @@
 import type { Message } from "ai";
-import {
-  streamText,
-  createDataStreamResponse,
-  appendResponseMessages
-} from "ai";
+import { createDataStreamResponse, appendResponseMessages } from "ai";
 import { model } from "~/models";
 import { auth } from "~/server/auth";
-import { z } from "zod";
-import { searchSerper } from "~/serper";
-import { bulkCrawlWebsites } from "~/server/scrape/jina-reader";
 import { db } from "~/server/db";
 import * as queries from "~/server/db/queries";
 import { userRequests, users, type DB } from "~/server/db/schema";
 import { eq, gte, and, sql } from "drizzle-orm";
 import { Langfuse, LangfuseTraceClient } from "langfuse";
+import { streamFromDeepSearch } from "~/server/aitooling/deepsearch";
 import { env } from "~/env";
 
 
@@ -172,52 +166,11 @@ export async function POST(request: Request) {
       const { messages } = body;
       const timeNow = new Date();
 
-      const result = streamText({
+      const result = streamFromDeepSearch({
+        timeNow,
         model,
         messages,
-        system: [
-          "You are a research assistant with access to search the web.",
-          "Ensure that the question that the user asks actually requires searching the web before answering.",
-          "If the question does not require research, reject it.",
-          "Always use the searchWeb tool before answering.",
-          "When you have all the information you need, answer the questions and provide inline link citations of your sources.",
-          "Prioritize recent information.",
-          "Use the scrapeUrls tool to get more information from specific URLs.",
-          "Gather a variety of sources (URLs) from searchWeb before using them in scrapeUrls.",
-          "Provide some pre-amble to let the user know what you are doing.",
-          "Always render the output as GitHub flavoured Markdown.",
-          `The current date is ${timeNow.toISOString()}.`,
-        ].join("\n"),
-        tools: {
-          searchWeb: {
-            description: "Search the web for information to answer the user's question",
-            parameters: z.object({
-              query: z.string().describe("The query to search the web for"),
-              numResults: z.number().min(10).max(15).describe("The number of results to return [10-15]"),
-            }),
-            execute: async ({ query, numResults }: { query: string; numResults: number }, { abortSignal }) => {
-              const results = await searchSerper({ q: query, num: numResults }, abortSignal);
-              const plainResults = results.organic.map((r) => ({
-                title: r.title,
-                link: r.link,
-                snippet: r.snippet,
-                date: r.date,
-              }))
-              return plainResults;
-            }
-          },
-          scrapeUrls: {
-            description: "Scrape the content from specific URLs",
-            parameters: z.object({
-              urls: z.string().array().describe("URLs that you want to scrape")
-            }),
-            execute: async ({ urls }: { urls: string[] }) => {
-              return await bulkCrawlWebsites({ urls });
-            }
-          }
-        },
-        maxSteps: 10,
-        onFinish: async ({ finishReason, usage, response }) => {
+        onFinish: async ({ response }) => {
           const oldMessages = messages;
           const newMessages = response.messages
           const allMessages = appendResponseMessages({ messages: oldMessages, responseMessages: newMessages });
@@ -229,14 +182,14 @@ export async function POST(request: Request) {
           });
           await langfuse.flushAsync();
         },
-        experimental_telemetry: {
+        telemetry: {
           isEnabled: true,
           functionId: "agent",
           metadata: {
             langfuseTraceId: trace.id,
           }
         }
-      });
+      })
 
       result.mergeIntoDataStream(dataStream);
     },
