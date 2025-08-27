@@ -14,7 +14,7 @@ import { db } from "~/server/db";
 import * as queries from "~/server/db/queries";
 import { userRequests, users, type DB } from "~/server/db/schema";
 import { eq, gte, and, sql } from "drizzle-orm";
-import { Langfuse } from "langfuse";
+import { Langfuse, LangfuseTraceClient } from "langfuse";
 import { env } from "~/env";
 
 
@@ -27,6 +27,8 @@ type RateLimitResult =
   | { type: "unauthorized", error: string }
   | { type: "rate-limited", error: string }
   ;
+
+
 
 async function checkRateLimit(userId: string): Promise<RateLimitResult> {
   // get the user from the database to check if they're an admin
@@ -73,8 +75,12 @@ const langfuse = new Langfuse({
 });
 
 export async function POST(request: Request) {
-  const session = await auth();
+  // construct trace as soon as possible and update it with key attributes as soon as we get them
+  const trace = langfuse.trace({
+    name: "Chat"
+  });
 
+  const session = await auth();
   if (!session) {
     return Response.json({
       error: "Unauthorized",
@@ -83,11 +89,17 @@ export async function POST(request: Request) {
     }, { status: 401 });
   }
 
+  // Associate the trace with the user
+  trace.update({ userId: session.user.id });
+
   const body = (await request.json()) as {
     messages: Array<Message>,
     chatId: string,
     isNewChat: boolean,
   };
+
+  // Associate the chat id with the trace
+  trace.update({ sessionId: body.chatId });
 
   if (body.messages.length === 0) {
     return Response.json({
@@ -97,7 +109,17 @@ export async function POST(request: Request) {
     }, { status: 400 });
   }
 
+  const checkRateLimitSpan = trace.span({
+    name: "check-rate-limit",
+    input: {
+      userId: session.user.id,
+    }
+  })
   const result = await checkRateLimit(session.user.id);
+  checkRateLimitSpan.end({
+    output: { result, }
+  });
+
   if (result.type !== "success") {
     if (result.type === "unauthorized") {
       return new Response(result.error, { status: 401 });
@@ -110,28 +132,40 @@ export async function POST(request: Request) {
 
   const user = result.user;
 
-  // Track the request
+  const userRequestsSpan = trace.span({
+    name: "track-request",
+    input: {
+      userId: user.id,
+      endpoint: "/api/chat",
+      status: "completed",
+    }
+  })
   await db.insert(userRequests).values({
     userId: user.id,
     endpoint: "/api/chat",
     status: "completed",
   });
+  userRequestsSpan.end();
 
   const chatId = body.chatId;
   const isNewChat = body.isNewChat;
 
-  const trace = langfuse.trace({
-    sessionId: chatId,
-    name: "Chat",
-    userId: user.id,
-  });
-
+  const upsertChatSpan = trace.span({
+    name: "upsert-chat",
+    input: {
+      userId: user.id,
+      chatId,
+      title: body.messages[0]?.content ?? "New Chat",
+      messages: body.messages,
+    }
+  })
   await queries.upsertChat({
     userId: user.id,
     chatId,
     title: body.messages[0]?.content ?? "New Chat",
     messages: body.messages,
   });
+  upsertChatSpan.end();
 
   return createDataStreamResponse({
     execute: async (dataStream) => {
