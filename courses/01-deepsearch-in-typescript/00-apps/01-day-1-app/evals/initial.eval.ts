@@ -26,6 +26,26 @@ evalite("Deep Search Eval", {
           },
         ],
       },
+      {
+        input: [
+          {
+            id: "1",
+            role: "user",
+            content:
+              "Compare and contrast React and Vue?",
+          },
+        ],
+      },
+      {
+        input: [
+          {
+            id: "1",
+            role: "user",
+            content:
+              "What are the differences between REST and gRPC?",
+          },
+        ],
+      },
     ];
   },
   task: async (input) => {
@@ -34,5 +54,20 @@ evalite("Deep Search Eval", {
       messages: input,
     });
   },
-  scorers: [],
+  scorers: [
+    {
+      name: "Contains links",
+      description: "The response contains at least one markdown link",
+      scorer: ({ output }) => {
+        return containsInlineMarkdownLink(output)
+          ? 1
+          : 0;
+      }
+    }
+  ],
 });
+
+function containsInlineMarkdownLink(s: string): boolean {
+  const inline = /\[[^\]]+\]\(\s*[^()\s]+(?:\s+"[^"]*")?\s*\)/;
+  return inline.test(s);
+}

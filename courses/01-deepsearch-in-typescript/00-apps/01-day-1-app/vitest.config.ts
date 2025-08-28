@@ -5,6 +5,7 @@ export default defineConfig({
   test: {
     setupFiles: ["dotenv/config"],
     testTimeout: 1000 * 60 * 5,
+    maxConcurrency: 2
   },
   plugins: [tsconfigPaths()],
 });
