@@ -2,7 +2,7 @@ import * as cheerio from "cheerio";
 import { setTimeout } from "node:timers/promises";
 import robotsParser from "robots-parser";
 import TurndownService from "turndown";
-import { cacheWithRedis } from "~/server/redis/redis.ts";
+import { cacheWithRedis } from "~/server/redis/cacheFn";
 import type { CrawlOptions, CrawlResponse, BulkCrawlOptions, BulkCrawlResponse, CrawlErrorResponse } from "./models";
 
 export const DEFAULT_MAX_RETRIES = 3;

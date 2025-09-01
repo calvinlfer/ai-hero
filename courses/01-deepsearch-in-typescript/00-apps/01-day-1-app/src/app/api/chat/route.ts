@@ -5,17 +5,23 @@ import { auth } from "~/server/auth";
 import { db } from "~/server/db";
 import * as queries from "~/server/db/queries";
 import { userRequests, users, type DB } from "~/server/db/schema";
+import { recordRateLimit, checkRateLimit, type RateLimitConfig } from "~/server/redis/rateLimiting";
 import { eq, gte, and, sql } from "drizzle-orm";
 import { Langfuse, LangfuseTraceClient } from "langfuse";
 import { streamFromDeepSearch } from "~/server/aitooling/deepsearch";
 import { env } from "~/env";
 
 
-export const maxDuration = 60;
-
+export const MaxDuration = 60;
 export const MaxRequestsPerDay = 10;
+const GlobalRateLimitConfig: RateLimitConfig = {
+  maxRequests: 1,
+  maxRetries: 3,
+  windowMs: 20 * 1000, // 20s
+  keyPrefix: "global_rate_limit",
+}
 
-type RateLimitResult =
+type UserRateLimitResult =
   | { type: "success", user: DB.User }
   | { type: "unauthorized", error: string }
   | { type: "rate-limited", error: string }
@@ -36,7 +42,7 @@ const spanner =
         return output;
       }
 
-async function checkRateLimit({ userId }: { userId: string }): Promise<RateLimitResult> {
+async function checkUserRateLimit({ userId }: { userId: string }): Promise<UserRateLimitResult> {
   // get the user from the database to check if they're an admin
   const user = await db.query.users.findFirst({
     where: eq(users.id, userId),
@@ -116,19 +122,30 @@ export async function POST(request: Request) {
     }, { status: 400 });
   }
 
-  const result = await mkSpan("check-rate-limit", checkRateLimit)({ userId: session.user.id });
+  const globalLimitResult = await mkSpan("check-global-rate-limit", checkRateLimit)(GlobalRateLimitConfig);
+  if (!globalLimitResult.allowed) {
+    console.log("Global rate limit exceeded, waiting...");
+    // do some retries
+    const isAllowed = await globalLimitResult.retry();
+    if (!isAllowed) {
+      return new Response("Too many requests", { status: 429 });
+    }
+  }
+  await mkSpan("record-global-rate-limit", recordRateLimit)(GlobalRateLimitConfig);
 
-  if (result.type !== "success") {
-    if (result.type === "unauthorized") {
-      return new Response(result.error, { status: 401 });
-    } else if (result.type === "rate-limited") {
-      return new Response(result.error, { status: 429 });
+  const userRateLimitResult = await mkSpan("check-user-rate-limit", checkUserRateLimit)({ userId: session.user.id });
+
+  if (userRateLimitResult.type !== "success") {
+    if (userRateLimitResult.type === "unauthorized") {
+      return new Response(userRateLimitResult.error, { status: 401 });
+    } else if (userRateLimitResult.type === "rate-limited") {
+      return new Response(userRateLimitResult.error, { status: 429 });
     } else {
       return new Response("Unknown error", { status: 500 });
     }
   }
 
-  const user = result.user;
+  const user = userRateLimitResult.user;
 
   await mkSpan("track-request", async (input: {
     userId: string,

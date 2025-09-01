@@ -1,4 +1,4 @@
-import { cacheWithRedis } from "../redis/redis";
+import { cacheWithRedis } from "../redis/cacheFn";
 import type { BulkCrawlOptions, BulkCrawlResponse, CrawlErrorResponse, CrawlOptions, CrawlResponse } from "./models";
 import { env } from "~/env";
 import { setTimeout } from "node:timers/promises";
