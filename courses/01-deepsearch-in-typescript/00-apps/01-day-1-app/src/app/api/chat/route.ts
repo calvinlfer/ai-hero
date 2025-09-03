@@ -7,7 +7,7 @@ import * as queries from "~/server/db/queries";
 import { userRequests, users, type DB } from "~/server/db/schema";
 import { recordRateLimit, checkRateLimit, type RateLimitConfig } from "~/server/redis/rateLimiting";
 import { eq, gte, and, sql } from "drizzle-orm";
-import { Langfuse, LangfuseTraceClient } from "langfuse";
+import { Langfuse, type LangfuseTraceClient } from "langfuse";
 import { streamFromDeepSearch } from "~/server/aitooling/deepsearch";
 import { env } from "~/env";
 

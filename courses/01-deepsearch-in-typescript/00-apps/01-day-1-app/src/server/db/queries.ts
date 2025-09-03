@@ -1,7 +1,7 @@
 import type { Message } from "ai";
 import { db } from "./index";
 import { chats, messages, type DB } from "./schema";
-import { eq, and, asc, desc } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 
 export type Chat = DB.Chat;
 type ChatWithMessages = DB.Chat & { messages: DB.Message[] };

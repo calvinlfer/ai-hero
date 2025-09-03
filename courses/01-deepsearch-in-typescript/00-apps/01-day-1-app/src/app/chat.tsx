@@ -52,17 +52,17 @@ export const ChatPage = ({ userName, chatId, isNewChat, initialMessages }: ChatP
   // data changes each time but the contents are the same
   // this is because of reference equality on arrays instead of value equality
   // this is a workaround to prevent the useEffect from running too often
-  const stableData = useMemo(() => data, [JSON.stringify(data)]);
+  const lastDataItem = data ? data[data.length - 1] : null;
+  const stableData = useMemo(() => data, [lastDataItem]);
 
   // redirect logic for new chats
   useEffect(() => {
-    console.log(`useEffect hook running because ${JSON.stringify(data)} keeps changing`)
+    console.log(`useEffect hook running`)
     const lastDataItem = stableData?.[stableData.length - 1];
     if (isNewChat && lastDataItem && isNewChatCreated(lastDataItem)) {
-      console.log(`Doing a redirect (${lastDataItem.chatId})`)
       router.push(`?chatId=${lastDataItem.chatId}`);
     }
-  }, [stableData]);
+  }, [stableData, isNewChat, router]);
 
   return (
     <>

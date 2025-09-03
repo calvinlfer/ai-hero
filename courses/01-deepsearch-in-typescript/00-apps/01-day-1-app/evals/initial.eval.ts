@@ -3,7 +3,7 @@ import type { Message } from "ai";
 import { askDeepSearch } from "~/server/aitooling/deepsearch";
 import { model } from "~/models";
 
-evalite("Deep Search Eval", {
+evalite("Markdown links are present inline", {
   data: async (): Promise<{ input: Message[] }[]> => {
     return [
       {
