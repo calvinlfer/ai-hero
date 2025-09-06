@@ -43,7 +43,44 @@ Bundling External Packages (Stable): New config options for App and Pages Router
 ESLint 9 Support: Added support for ESLint 9.
 Development and Build Performance: Improved build times and Faster Fast Refresh.
 `,
-      }
+      },
+      {
+        // Multi-hop
+        input: [
+          {
+            id: "1",
+            role: "user",
+            content: "What are the biggest gainers in the stock market on September 5,2025 from the following tickers GOOGL, AAPL, AMD, NVDA?",
+          }
+        ],
+        expected: "GOOGL",
+      },
+      {
+        // Another multi-hop https://www.reddit.com/r/LocalLLaMA/comments/17zsb0w/qa_expert_the_llm_to_handle_multihop_question
+        input: [
+          {
+            id: "1",
+            role: "user",
+            content: "What are top tourists attractions in the biggest city in Japan?",
+          }
+        ],
+        expected: `Here are attractions in Tokyo
+        Tsukiji outer market
+        Akihabara
+        Tokyo National Museum
+        Imperial Palace
+        `,
+      },
+      {
+        input: [
+          {
+            id: "1",
+            role: "user",
+            content: "What is the population of Vietnam compared to the Philippines",
+          }
+        ],
+        expected: "The current population of the Philippines is roughly 12-15% larger than Vietnam",
+      },
     ];
   },
   task: async (input) => {
