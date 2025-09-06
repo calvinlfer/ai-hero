@@ -36,7 +36,7 @@ const extractArticleText = (html: string): string => {
     const element = $(selector);
     if (element.length) {
       content = turndownService.turndown(
-        element.html() || "",
+        element.html() ?? "",
       );
       break;
     }
@@ -44,7 +44,7 @@ const extractArticleText = (html: string): string => {
 
   if (!content) {
     content = turndownService.turndown(
-      $("body").html() || "",
+      $("body").html() ?? "",
     );
   }
 
