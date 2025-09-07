@@ -22,6 +22,7 @@ export const env = createEnv({
     LANGFUSE_PUBLIC_KEY: z.string(),
     LANGFUSE_SECRET_KEY: z.string(),
     JINA_API_KEY: z.string(),
+    SEARCH_RESULTS_COUNT: z.coerce.number().min(2).max(15).default(10),
     EVAL_DATASET: z
       .enum(["dev", "ci", "regression"])
       .default("dev"),
@@ -50,6 +51,7 @@ export const env = createEnv({
     LANGFUSE_SECRET_KEY: process.env.LANGFUSE_SECRET_KEY,
     JINA_API_KEY: process.env.JINA_API_KEY,
     EVAL_DATASET: process.env.EVAL_DATASET,
+    SEARCH_RESULTS_COUNT: process.env.SEARCH_RESULTS_COUNT,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially
