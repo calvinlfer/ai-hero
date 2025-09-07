@@ -8,6 +8,7 @@ import { env } from "~/env";
 import { devData } from "./datasets/dev";
 import { ciData } from "./datasets/ci";
 import { regressionData } from "./datasets/regression";
+import { checkAnswerRelevancy } from "./mastraAnswerRelevancy";
 
 evalite("Deep Search Eval", {
   data: async (): Promise<{ input: Message[]; expected: string }[]> => {
@@ -17,6 +18,7 @@ evalite("Deep Search Eval", {
     return [...dev, ...ci, ...regression];
   },
   task: async (input) => {
+    console.log("Evaluating:", input[0]?.content ?? "");
     return await askDeepSearch({
       model,
       messages: input,
@@ -40,6 +42,15 @@ evalite("Deep Search Eval", {
     {
       name: "Contains inline Markdown links",
       scorer: ({ output }) => containsInlineMarkdownLink(output) ? 1 : 0
+    },
+    {
+      name: "Mastra Answer Relevancy",
+      scorer: async ({ input, output }) => {
+        return await checkAnswerRelevancy({
+          question: input.map((m) => m.content).join("\n"),
+          submission: output,
+        });
+      },
     },
   ],
 });

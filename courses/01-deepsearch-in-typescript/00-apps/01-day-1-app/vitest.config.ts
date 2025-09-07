@@ -4,8 +4,8 @@ import tsconfigPaths from "vite-tsconfig-paths";
 export default defineConfig({
   test: {
     setupFiles: ["dotenv/config"],
-    testTimeout: 1000 * 60 * 5,
-    maxConcurrency: 2
+    testTimeout: 1000 * 60 * 8,
+    maxConcurrency: 8
   },
   plugins: [tsconfigPaths()],
 });
