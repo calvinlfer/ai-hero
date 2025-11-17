@@ -40,6 +40,10 @@ export const getNextAction: (
 
     ${context.getScrapeHistory()}
     `,
+    experimental_telemetry: {
+      isEnabled: true,
+      functionId: "getNextAction",
+    },
   });
 
   const out: Action = match(result.object)
